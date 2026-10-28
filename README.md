@@ -6,6 +6,23 @@ O recorte de portfólio é a fatia de **avaliar e manter** um pipeline de IA, n�
 
 Pesquisa que orientou o layout: [docs/pesquisa-portfolio.md](docs/pesquisa-portfolio.md).
 
+## Como funciona
+
+`run` chama o modelo e grava `outputs/`. `score`, `pytest` e o CI só relêem o que já está no Git.
+
+```mermaid
+flowchart TD
+  A[prompt.md + inputs.yaml] --> B{comando}
+  B -->|run| C[LiteLLM / OpenRouter]
+  C --> D[outputs/]
+  B -->|score, pytest, CI| D
+  D --> E[contrato Pydantic]
+  E -->|001 SQL| F[DuckDB]
+  E -->|002 limpeza| G[campos]
+  F --> H[results.json]
+  G --> H
+```
+
 ## 001 — Geração de SQL
 
 Modelo pinado: `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` (OpenRouter, 2026-10-28). Custo USD 0. Uma variável por vez.
