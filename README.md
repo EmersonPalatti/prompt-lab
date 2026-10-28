@@ -1,8 +1,8 @@
 # Prompt Lab
 
-Pipeline de avaliação para LLM em tarefas de dados. Não é um chat e não é treino de modelo: é um harness — contrato Pydantic, exec/campos determinísticos, versões de prompt, tokens/custo, CI sem chave.
+Pipeline de avaliação para LLM em tarefas de dados: prompts versionados, uma variável por vez, métrica determinística. Cobre **experimentação com LLMs**, não automação em produção nem dashboard interno.
 
-O recorte de portfólio é a fatia de **avaliar e manter** um pipeline de IA, não de publicar pesos.
+Não é um chat e não é treino de modelo. O recorte é **avaliar e manter** o pipeline.
 
 Pesquisa que orientou o layout: [docs/pesquisa-portfolio.md](docs/pesquisa-portfolio.md).
 
@@ -22,6 +22,32 @@ flowchart TD
   F --> H[results.json]
   G --> H
 ```
+
+## Exemplo de prompt
+
+A v2 do 001 (a que sobe o `pass_rate`). System e user pedem o mesmo contrato; o modelo não vê os `INSERT`.
+
+System (`experiments/001-sql-generation/v2/system.md`):
+
+```
+Você escreve SQL DuckDB para a pergunta do usuário. Use somente as tabelas e colunas do esquema. A resposta inteira é um objeto JSON com a chave sql.
+```
+
+User (`experiments/001-sql-generation/v2/prompt.md`):
+
+```
+Esquema:
+
+{{schema}}
+
+Pergunta: {{question}}
+
+Responda com um JSON neste formato, sem texto em volta:
+
+{"sql": "SELECT ..."}
+```
+
+A v1 tira o JSON e pede “só a consulta” — é a única mudança. A v3 só acrescenta dois few-shots; o `pass_rate` não sobe. A 002 segue o mesmo corte com `{"rows": [...]}`.
 
 ## 001 — Geração de SQL
 
