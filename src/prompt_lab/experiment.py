@@ -23,9 +23,19 @@ _SELECT = re.compile(r"^(SELECT|WITH)\b", re.IGNORECASE)
 _CREATE = re.compile(r"^CREATE\b", re.IGNORECASE)
 
 
-def load_spec(path: Path) -> ExperimentSpec:
+def load_yaml_mapping(path: Path) -> dict:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return ExperimentSpec.model_validate(data)
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} deve ser um mapeamento YAML")
+    return data
+
+
+def experiment_kind(experiment: Path) -> str:
+    return str(load_yaml_mapping(experiment / "inputs.yaml").get("kind", "sql"))
+
+
+def load_spec(path: Path) -> ExperimentSpec:
+    return ExperimentSpec.model_validate(load_yaml_mapping(path))
 
 
 def schema_text(setup: list[str]) -> str:
@@ -33,8 +43,12 @@ def schema_text(setup: list[str]) -> str:
     return "\n\n".join(creates)
 
 
-def render_prompt(template: str, *, question: str, schema: str) -> str:
-    return template.replace("{{question}}", question).replace("{{schema}}", schema)
+def render_prompt(template: str, *, question: str, schema: str = "", rows: str = "") -> str:
+    return (
+        template.replace("{{question}}", question)
+        .replace("{{schema}}", schema)
+        .replace("{{rows}}", rows)
+    )
 
 
 def parse_sql(text: str) -> tuple[str | None, str | None]:
@@ -125,7 +139,13 @@ def list_versions(experiment: Path) -> list[str]:
     return sorted(names)
 
 
-def render_case(experiment: Path, version: str, question: str, schema: str) -> dict:
+def render_case(
+    experiment: Path,
+    version: str,
+    question: str,
+    schema: str = "",
+    rows: str = "",
+) -> dict:
     prompt_dir = experiment / version
     system_path = prompt_dir / "system.md"
     return {
@@ -133,6 +153,7 @@ def render_case(experiment: Path, version: str, question: str, schema: str) -> d
             system_path.read_text(encoding="utf-8"),
             question=question,
             schema=schema,
+            rows=rows,
         )
         if system_path.is_file()
         else None,
@@ -140,8 +161,52 @@ def render_case(experiment: Path, version: str, question: str, schema: str) -> d
             (prompt_dir / "prompt.md").read_text(encoding="utf-8"),
             question=question,
             schema=schema,
+            rows=rows,
         ),
     }
+
+
+def prompts_for_run(experiment: Path) -> list[tuple[str, str, dict]]:
+    """Lista (case_id, version, rendered) para o runner."""
+
+    versions = list_versions(experiment)
+    items: list[tuple[str, str, dict]] = []
+    if experiment_kind(experiment) == "cleaning":
+        from prompt_lab.cleaning import load_cleaning_spec
+
+        spec = load_cleaning_spec(experiment / "inputs.yaml")
+        for case in spec.cases:
+            rows = json.dumps(case.input_rows, ensure_ascii=False, indent=2)
+            for version in versions:
+                items.append(
+                    (
+                        case.id,
+                        version,
+                        render_case(experiment, version, case.question, rows=rows),
+                    )
+                )
+        return items
+
+    spec = load_spec(experiment / "inputs.yaml")
+    schema = schema_text(spec.setup)
+    for case in spec.cases:
+        for version in versions:
+            items.append(
+                (
+                    case.id,
+                    version,
+                    render_case(experiment, version, case.question, schema),
+                )
+            )
+    return items
+
+
+def score_path(experiment: Path) -> dict:
+    if experiment_kind(experiment) == "cleaning":
+        from prompt_lab.cleaning import score_cleaning_experiment
+
+        return score_cleaning_experiment(experiment)
+    return score_experiment(experiment)
 
 
 def _score_output(output: str, setup: list[str], expected_rows: list[dict]) -> dict:
@@ -257,11 +322,10 @@ def public_payload(summary: dict) -> dict:
             "id": item["id"],
             "version": item["version"],
             "json_ok": item["json_ok"],
-            "sql_extracted": item["sql_extracted"],
             "rows_match": item["rows_match"],
             "error": item["error"],
         }
-        for key in ("latency_s", "prompt_tokens", "completion_tokens"):
+        for key in ("sql_extracted", "field_accuracy", "latency_s", "prompt_tokens", "completion_tokens"):
             if item.get(key) is not None:
                 row[key] = item[key]
         public_cases.append(row)
@@ -275,7 +339,7 @@ def public_payload(summary: dict) -> dict:
 
 
 def write_results(experiment: Path, summary: dict | None = None, extra: dict | None = None) -> Path:
-    summary = summary or score_experiment(experiment)
+    summary = summary or score_path(experiment)
     destination = experiment / "results.json"
     existing: dict = {}
     if destination.is_file():

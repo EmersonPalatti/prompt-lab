@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from prompt_lab.schema import ExperimentSpec, SqlAnswer
+from prompt_lab.schema import CleanAnswer, ExperimentSpec, SqlAnswer
 
 
 def test_sql_answer_rejects_empty_query():
@@ -27,3 +27,8 @@ def test_sql_answer_allows_trailing_semicolon():
 def test_experiment_spec_requires_cases():
     with pytest.raises(ValidationError):
         ExperimentSpec.model_validate({"setup": ["CREATE TABLE t (n INTEGER)"]})
+
+
+def test_clean_answer_requires_rows():
+    with pytest.raises(ValidationError):
+        CleanAnswer.model_validate_json("{}")

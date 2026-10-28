@@ -1,0 +1,162 @@
+{
+  "experiment": "002-data-cleaning",
+  "note": "Saídas gravadas por LiteLLM/OpenRouter em outputs/. A pontuação é local, por campos.",
+  "metrics": {
+    "v1": {
+      "cases": 6,
+      "json_ok": 0,
+      "rows_match": 0,
+      "field_accuracy": 0.0,
+      "pass_rate": 0.0
+    },
+    "v2": {
+      "cases": 6,
+      "json_ok": 6,
+      "rows_match": 6,
+      "field_accuracy": 1.0,
+      "pass_rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "id": "city_typo",
+      "version": "v1",
+      "json_ok": false,
+      "rows_match": false,
+      "error": "Invalid JSON: trailing characters at line 2 column 1",
+      "field_accuracy": 0.0,
+      "latency_s": 21.149,
+      "prompt_tokens": 278,
+      "completion_tokens": 297
+    },
+    {
+      "id": "city_typo",
+      "version": "v2",
+      "json_ok": true,
+      "rows_match": true,
+      "error": null,
+      "field_accuracy": 1.0,
+      "latency_s": 6.173,
+      "prompt_tokens": 328,
+      "completion_tokens": 184
+    },
+    {
+      "id": "status_synonym",
+      "version": "v1",
+      "json_ok": false,
+      "rows_match": false,
+      "error": "Invalid JSON: trailing characters at line 2 column 1",
+      "field_accuracy": 0.0,
+      "latency_s": 6.746,
+      "prompt_tokens": 315,
+      "completion_tokens": 553
+    },
+    {
+      "id": "status_synonym",
+      "version": "v2",
+      "json_ok": true,
+      "rows_match": true,
+      "error": null,
+      "field_accuracy": 1.0,
+      "latency_s": 4.862,
+      "prompt_tokens": 365,
+      "completion_tokens": 348
+    },
+    {
+      "id": "null_city",
+      "version": "v1",
+      "json_ok": false,
+      "rows_match": false,
+      "error": "Invalid JSON: trailing characters at line 1 column 2",
+      "field_accuracy": 0.0,
+      "latency_s": 3.218,
+      "prompt_tokens": 314,
+      "completion_tokens": 248
+    },
+    {
+      "id": "null_city",
+      "version": "v2",
+      "json_ok": true,
+      "rows_match": true,
+      "error": null,
+      "field_accuracy": 1.0,
+      "latency_s": 2.787,
+      "prompt_tokens": 364,
+      "completion_tokens": 192
+    },
+    {
+      "id": "mixed_batch",
+      "version": "v1",
+      "json_ok": false,
+      "rows_match": false,
+      "error": "Invalid JSON: expected value at line 1 column 1",
+      "field_accuracy": 0.0,
+      "latency_s": 2.931,
+      "prompt_tokens": 320,
+      "completion_tokens": 179
+    },
+    {
+      "id": "mixed_batch",
+      "version": "v2",
+      "json_ok": true,
+      "rows_match": true,
+      "error": null,
+      "field_accuracy": 1.0,
+      "latency_s": 12.656,
+      "prompt_tokens": 370,
+      "completion_tokens": 438
+    },
+    {
+      "id": "unknown_status",
+      "version": "v1",
+      "json_ok": false,
+      "rows_match": false,
+      "error": "Invalid JSON: trailing characters at line 1 column 2",
+      "field_accuracy": 0.0,
+      "latency_s": 23.864,
+      "prompt_tokens": 284,
+      "completion_tokens": 178
+    },
+    {
+      "id": "unknown_status",
+      "version": "v2",
+      "json_ok": true,
+      "rows_match": true,
+      "error": null,
+      "field_accuracy": 1.0,
+      "latency_s": 9.931,
+      "prompt_tokens": 334,
+      "completion_tokens": 459
+    },
+    {
+      "id": "extra_notes",
+      "version": "v1",
+      "json_ok": false,
+      "rows_match": false,
+      "error": "Extra inputs are not permitted",
+      "field_accuracy": 0.0,
+      "latency_s": 10.627,
+      "prompt_tokens": 261,
+      "completion_tokens": 407
+    },
+    {
+      "id": "extra_notes",
+      "version": "v2",
+      "json_ok": true,
+      "rows_match": true,
+      "error": null,
+      "field_accuracy": 1.0,
+      "latency_s": 2.043,
+      "prompt_tokens": 311,
+      "completion_tokens": 159
+    }
+  ],
+  "source": "openrouter",
+  "model": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+  "started_at": "2026-10-28T01:21:55Z",
+  "finished_at": "2026-10-28T01:23:44Z",
+  "cost_usd": 0.0,
+  "repeats": 1,
+  "prompt_tokens": 3844,
+  "completion_tokens": 3642
+}

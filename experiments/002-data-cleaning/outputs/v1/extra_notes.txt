@@ -1,0 +1,1 @@
+{"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10}

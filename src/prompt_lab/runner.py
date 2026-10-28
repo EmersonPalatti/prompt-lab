@@ -8,11 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from prompt_lab.experiment import (
+    experiment_kind,
     list_versions,
-    load_spec,
-    render_case,
-    schema_text,
-    score_experiment,
+    prompts_for_run,
+    score_path,
     write_results,
 )
 
@@ -100,46 +99,50 @@ def run_experiment(
     if not os.environ.get("OPENROUTER_API_KEY"):
         raise RuntimeError("OPENROUTER_API_KEY ausente. Copie .env.example para .env.")
 
-    spec = load_spec(experiment / "inputs.yaml")
-    schema = schema_text(spec.setup)
     available = list_versions(experiment)
     selected = versions or available
     missing = [name for name in selected if name not in available]
     if missing:
         raise ValueError(f"versão inexistente: {', '.join(missing)}")
-    versions = selected
+    wanted = set(selected)
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     usages: dict[tuple[str, str], dict] = {}
     prompt_tokens = 0
     completion_tokens = 0
     cost_usd = 0.0
     fatal: Exception | None = None
+    kind = experiment_kind(experiment)
+    score_note = (
+        "A pontuação é local, no DuckDB."
+        if kind == "sql"
+        else "A pontuação é local, por campos."
+    )
 
     try:
-        for case in spec.cases:
-            for version in versions:
-                rendered = render_case(experiment, version, case.question, schema)
-                messages = []
-                if rendered["system"]:
-                    messages.append({"role": "system", "content": rendered["system"]})
-                messages.append({"role": "user", "content": rendered["prompt"]})
-                print(f"{version}/{case.id}", flush=True)
-                reply = call(messages, model)
-                output_dir = experiment / "outputs" / version
-                output_dir.mkdir(parents=True, exist_ok=True)
-                (output_dir / f"{case.id}.txt").write_text(reply.content, encoding="utf-8")
-                usages[(version, case.id)] = {
-                    "latency_s": reply.latency_s,
-                    "prompt_tokens": reply.prompt_tokens,
-                    "completion_tokens": reply.completion_tokens,
-                }
-                prompt_tokens += reply.prompt_tokens
-                completion_tokens += reply.completion_tokens
-                cost_usd += reply.cost_usd
+        for case_id, version, rendered in prompts_for_run(experiment):
+            if version not in wanted:
+                continue
+            messages = []
+            if rendered["system"]:
+                messages.append({"role": "system", "content": rendered["system"]})
+            messages.append({"role": "user", "content": rendered["prompt"]})
+            print(f"{version}/{case_id}", flush=True)
+            reply = call(messages, model)
+            output_dir = experiment / "outputs" / version
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / f"{case_id}.txt").write_text(reply.content, encoding="utf-8")
+            usages[(version, case_id)] = {
+                "latency_s": reply.latency_s,
+                "prompt_tokens": reply.prompt_tokens,
+                "completion_tokens": reply.completion_tokens,
+            }
+            prompt_tokens += reply.prompt_tokens
+            completion_tokens += reply.completion_tokens
+            cost_usd += reply.cost_usd
     except Exception as exc:
         fatal = exc
 
-    summary = score_experiment(experiment)
+    summary = score_path(experiment)
     for item in summary["cases"]:
         extra = usages.get((item["version"], item["id"]))
         if extra:
@@ -157,7 +160,7 @@ def run_experiment(
             "repeats": repeats,
             "note": (
                 "Saídas gravadas por LiteLLM/OpenRouter em outputs/. "
-                "A pontuação é local, no DuckDB."
+                + score_note
             ),
         },
     )

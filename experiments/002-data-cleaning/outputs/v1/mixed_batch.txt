@@ -1,0 +1,4 @@
+id,city,status,amount
+1,Sao Paulo,paid,10
+2,,open,99
+3,Recife,open,5

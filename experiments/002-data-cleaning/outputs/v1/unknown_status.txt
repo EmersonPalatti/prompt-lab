@@ -1,0 +1,2 @@
+1,Sao Paulo,cancelado,10
+2,Recife,paid,5

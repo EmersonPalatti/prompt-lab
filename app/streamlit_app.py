@@ -1,11 +1,11 @@
-"""Demo local do experimento 001. Não chama modelo."""
+"""Demo local dos experimentos. Não chama modelo."""
 
 import json
 from pathlib import Path
 
 import streamlit as st
 
-from prompt_lab.experiment import score_experiment
+from prompt_lab.experiment import score_path
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPERIMENTS = ROOT / "experiments"
@@ -13,7 +13,7 @@ EXPERIMENTS = ROOT / "experiments"
 
 st.set_page_config(page_title="Prompt Lab", layout="wide")
 st.title("Prompt Lab")
-st.caption("Eval de geração de SQL. As notas vêm de outputs/ commitados, sem chamada de modelo.")
+st.caption("Eval de prompts para dados. As notas vêm de outputs/ commitados, sem chamada de modelo.")
 
 if not EXPERIMENTS.is_dir():
     st.error(f"Não achei a pasta de experimentos em {EXPERIMENTS}.")
@@ -45,7 +45,7 @@ if results_path.is_file():
         st.caption(" · ".join(bits))
 
 try:
-    summary = score_experiment(experiment)
+    summary = score_path(experiment)
 except (OSError, ValueError, KeyError) as exc:
     st.error(f"Não consegui pontuar este experimento: {exc}")
     st.stop()
@@ -73,10 +73,14 @@ with right:
     st.code(match["output"] or "(ausente)", language="json" if match["json_ok"] else "text")
     passed = match["json_ok"] and match["rows_match"]
     status = "passou" if passed else "falhou"
-    st.markdown(
-        f"**{status}.** JSON válido: `{match['json_ok']}`. "
-        f"SQL extraído: `{match['sql_extracted']}`. "
-        f"Linhas corretas: `{match['rows_match']}`."
-    )
+    details = [
+        f"JSON válido: `{match['json_ok']}`",
+        f"Linhas corretas: `{match['rows_match']}`",
+    ]
+    if "sql_extracted" in match:
+        details.insert(1, f"SQL extraído: `{match['sql_extracted']}`")
+    if match.get("field_accuracy") is not None:
+        details.append(f"Campos: `{match['field_accuracy']}`")
+    st.markdown(f"**{status}.** " + " ".join(details) + ".")
     if match["error"]:
         st.warning(match["error"])

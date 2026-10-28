@@ -1,0 +1,1 @@
+{"rows": [{"id": 1, "city": null, "status": "paid", "amount": 8}, {"id": 2, "city": null, "status": "open", "amount": 3}, {"id": 3, "city": null, "status": "paid", "amount": 2}]}
