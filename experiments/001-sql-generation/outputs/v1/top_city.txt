@@ -1,0 +1,13 @@
+WITH paid_orders AS (
+    SELECT city, amount
+    FROM orders
+    WHERE status = 'paid' AND city IS NOT NULL
+)
+SELECT city
+FROM (
+    SELECT city, SUM(amount) AS total
+    FROM paid_orders
+    GROUP BY city
+) AS agg
+ORDER BY total DESC
+LIMIT 1;

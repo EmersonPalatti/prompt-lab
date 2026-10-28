@@ -1,0 +1,3 @@
+SELECT COUNT(*) AS n
+FROM orders
+WHERE city IS NULL;

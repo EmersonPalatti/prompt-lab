@@ -1,0 +1,1 @@
+{"sql": "SELECT r.name, SUM(o.amount) AS total FROM restaurants r JOIN orders o ON r.id = o.restaurant_id WHERE o.status = 'paid' GROUP BY r.name"}

@@ -1,0 +1,235 @@
+{
+  "experiment": "001-sql-generation",
+  "note": "Saídas gravadas por LiteLLM/OpenRouter em outputs/. A pontuação é local, no DuckDB.",
+  "metrics": {
+    "v1": {
+      "cases": 6,
+      "json_ok": 0,
+      "sql_extracted": 5,
+      "rows_match": 5,
+      "pass_rate": 0.0
+    },
+    "v2": {
+      "cases": 6,
+      "json_ok": 6,
+      "sql_extracted": 6,
+      "rows_match": 5,
+      "pass_rate": 0.8333
+    },
+    "v3": {
+      "cases": 6,
+      "json_ok": 5,
+      "sql_extracted": 5,
+      "rows_match": 5,
+      "pass_rate": 0.8333
+    }
+  },
+  "cases": [
+    {
+      "id": "paid_by_city",
+      "version": "v1",
+      "json_ok": false,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": "JSON inválido (execução ok, diagnóstico)",
+      "latency_s": 3.176,
+      "prompt_tokens": 122,
+      "completion_tokens": 120
+    },
+    {
+      "id": "paid_by_city",
+      "version": "v2",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 2.827,
+      "prompt_tokens": 148,
+      "completion_tokens": 102
+    },
+    {
+      "id": "paid_by_city",
+      "version": "v3",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 4.372,
+      "prompt_tokens": 228,
+      "completion_tokens": 203
+    },
+    {
+      "id": "open_count",
+      "version": "v1",
+      "json_ok": false,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": "JSON inválido (execução ok, diagnóstico)",
+      "latency_s": 5.573,
+      "prompt_tokens": 112,
+      "completion_tokens": 156
+    },
+    {
+      "id": "open_count",
+      "version": "v2",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 4.79,
+      "prompt_tokens": 138,
+      "completion_tokens": 139
+    },
+    {
+      "id": "open_count",
+      "version": "v3",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 50.478,
+      "prompt_tokens": 218,
+      "completion_tokens": 99
+    },
+    {
+      "id": "gmv_by_restaurant",
+      "version": "v1",
+      "json_ok": false,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": "JSON inválido (execução ok, diagnóstico)",
+      "latency_s": 4.789,
+      "prompt_tokens": 116,
+      "completion_tokens": 198
+    },
+    {
+      "id": "gmv_by_restaurant",
+      "version": "v2",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 2.517,
+      "prompt_tokens": 142,
+      "completion_tokens": 133
+    },
+    {
+      "id": "gmv_by_restaurant",
+      "version": "v3",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 5.013,
+      "prompt_tokens": 222,
+      "completion_tokens": 202
+    },
+    {
+      "id": "unknown_column",
+      "version": "v1",
+      "json_ok": false,
+      "sql_extracted": false,
+      "rows_match": false,
+      "error": "Invalid JSON: expected value at line 1 column 1",
+      "latency_s": 4.748,
+      "prompt_tokens": 117,
+      "completion_tokens": 203
+    },
+    {
+      "id": "unknown_column",
+      "version": "v2",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": false,
+      "error": "Parser Error: syntax error at or near \"Incompatible\"",
+      "latency_s": 9.6,
+      "prompt_tokens": 143,
+      "completion_tokens": 360
+    },
+    {
+      "id": "unknown_column",
+      "version": "v3",
+      "json_ok": false,
+      "sql_extracted": false,
+      "rows_match": false,
+      "error": "Extra inputs are not permitted",
+      "latency_s": 23.882,
+      "prompt_tokens": 223,
+      "completion_tokens": 658
+    },
+    {
+      "id": "null_city",
+      "version": "v1",
+      "json_ok": false,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": "JSON inválido (execução ok, diagnóstico)",
+      "latency_s": 14.695,
+      "prompt_tokens": 112,
+      "completion_tokens": 78
+    },
+    {
+      "id": "null_city",
+      "version": "v2",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 1.45,
+      "prompt_tokens": 138,
+      "completion_tokens": 79
+    },
+    {
+      "id": "null_city",
+      "version": "v3",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 2.39,
+      "prompt_tokens": 218,
+      "completion_tokens": 79
+    },
+    {
+      "id": "top_city",
+      "version": "v1",
+      "json_ok": false,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": "JSON inválido (execução ok, diagnóstico)",
+      "latency_s": 10.41,
+      "prompt_tokens": 122,
+      "completion_tokens": 373
+    },
+    {
+      "id": "top_city",
+      "version": "v2",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 4.366,
+      "prompt_tokens": 148,
+      "completion_tokens": 286
+    },
+    {
+      "id": "top_city",
+      "version": "v3",
+      "json_ok": true,
+      "sql_extracted": true,
+      "rows_match": true,
+      "error": null,
+      "latency_s": 16.409,
+      "prompt_tokens": 228,
+      "completion_tokens": 362
+    }
+  ],
+  "source": "openrouter",
+  "model": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+  "started_at": "2026-10-28T00:37:49Z",
+  "finished_at": "2026-10-28T01:10:49Z",
+  "cost_usd": 0.0,
+  "repeats": 1,
+  "prompt_tokens": 2895,
+  "completion_tokens": 3830
+}

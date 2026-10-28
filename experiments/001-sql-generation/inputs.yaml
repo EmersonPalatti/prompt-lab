@@ -1,0 +1,60 @@
+setup:
+  - |
+    CREATE TABLE restaurants (
+      id INTEGER,
+      name VARCHAR,
+      city VARCHAR
+    )
+  - |
+    CREATE TABLE orders (
+      id INTEGER,
+      restaurant_id INTEGER,
+      city VARCHAR,
+      status VARCHAR,
+      amount INTEGER
+    )
+  - |
+    INSERT INTO restaurants VALUES
+      (1, 'Padaria Central', 'Sao Paulo'),
+      (2, 'Bar do Cais', 'Recife'),
+      (3, 'Cozinha Norte', 'Sao Paulo')
+  - |
+    INSERT INTO orders VALUES
+      (1, 1, 'Sao Paulo', 'paid', 10),
+      (2, 1, 'Sao Paulo', 'open', 99),
+      (3, 2, 'Recife', 'paid', 5),
+      (4, 3, 'Sao Paulo', 'paid', 20),
+      (5, 3, NULL, 'paid', 8)
+
+cases:
+  - id: paid_by_city
+    question: Total pago por cidade, apenas pedidos com status paid e city não nula. Colunas city e total.
+    expected_rows:
+      - city: Recife
+        total: 5
+      - city: Sao Paulo
+        total: 30
+  - id: open_count
+    question: Quantos pedidos estão com status open? Coluna n.
+    expected_rows:
+      - n: 1
+  - id: gmv_by_restaurant
+    question: Total pago (status paid) por nome de restaurante. Colunas name e total.
+    expected_rows:
+      - name: Bar do Cais
+        total: 5
+      - name: Cozinha Norte
+        total: 28
+      - name: Padaria Central
+        total: 10
+  - id: unknown_column
+    question: Média da coluna courier_rating por cidade. Colunas city e avg_rating.
+    expected_rows: []
+  - id: null_city
+    question: Quantos pedidos têm city nula? Coluna n.
+    expected_rows:
+      - n: 1
+  - id: top_city
+    question: Cidade com maior total pago (status paid, ignore city nula). Só a coluna city, uma linha.
+    expected_rows:
+      - city: Sao Paulo

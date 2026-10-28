@@ -1,0 +1,1 @@
+{"sql": "SELECT COUNT(*) AS n FROM orders WHERE status = 'open'"}

@@ -1,0 +1,1 @@
+{"sql": "SELECT city FROM orders WHERE status = 'paid' AND city IS NOT NULL GROUP BY city ORDER BY SUM(amount) DESC LIMIT 1;"}

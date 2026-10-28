@@ -1,0 +1,10 @@
+SELECT
+    `city`,
+    SUM(`amount`) AS `total`
+FROM
+    `orders`
+WHERE
+    `status` = 'paid'
+    AND `city` IS NOT NULL
+GROUP BY
+    `city`;
