@@ -1,0 +1,1 @@
+{"error": "coluna courier_rating não existe no esquema"}

@@ -1,6 +1,9 @@
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+_STRIP_QUOTES = re.compile(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"")
 
 
 class SqlAnswer(BaseModel):
@@ -19,6 +22,37 @@ class SqlAnswer(BaseModel):
         if not is_single_statement(stripped):
             raise ValueError("sql deve ser um único statement")
         return stripped
+
+
+class SqlOrErrorAnswer(BaseModel):
+    """Contrato da v4: um objeto JSON com `sql` ou com `error` (recusa estruturada)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sql: str | None = None
+    error: str | None = None
+
+    @model_validator(mode="after")
+    def validate_one_branch(self) -> "SqlOrErrorAnswer":
+        has_sql = self.sql is not None
+        has_error = self.error is not None
+        if has_sql == has_error:
+            raise ValueError("resposta deve ter exatamente um entre 'sql' ou 'error'")
+
+        if has_sql:
+            stripped = self.sql.strip()
+            if not stripped:
+                raise ValueError("sql não pode ser vazio")
+            if not is_single_statement(stripped):
+                raise ValueError("sql deve ser um único statement")
+            self.sql = stripped
+        else:
+            stripped = self.error.strip()
+            if not stripped:
+                raise ValueError("error não pode ser vazio")
+            self.error = stripped
+
+        return self
 
 
 class CaseSpec(BaseModel):
@@ -59,11 +93,13 @@ class CleaningCaseSpec(BaseModel):
 
 class CleaningSpec(BaseModel):
     kind: Literal["cleaning"]
+    compare_keys: tuple[str, ...] = ("city", "status", "amount")
     cases: list[CleaningCaseSpec] = Field(min_length=1)
 
 
 def is_single_statement(sql: str) -> bool:
     body = sql.strip()
+    body = _STRIP_QUOTES.sub("", body).strip()
     if body.endswith(";"):
         body = body[:-1]
     return ";" not in body

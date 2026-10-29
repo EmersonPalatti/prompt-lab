@@ -47,7 +47,7 @@ Responda com um JSON neste formato, sem texto em volta:
 {"sql": "SELECT ..."}
 ```
 
-A v1 tira o JSON e pede “só a consulta” — é a única mudança. A v3 só acrescenta dois few-shots; o `pass_rate` não sobe. A 002 segue o mesmo corte com `{"rows": [...]}`.
+A v1 tira o JSON e pede “só a consulta” — é a única mudança. A v3 só acrescenta dois few-shots; o `pass_rate` não sobe. A v4 adiciona o ramo `{"error": "..."}` ao contrato para recusar colunas inexistentes e chega a 1.00. A 002 segue o mesmo corte com `{"rows": [...]}`.
 
 ## 001 — Geração de SQL
 
@@ -58,8 +58,9 @@ Modelo pinado: `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` (OpenRouter, 
 | v1 — “só SQL” | 0/6 | 5/6 | **0.00** |
 | v2 — `{"sql": "..."}` | 6/6 | 5/6 | **0.83** |
 | v3 — v2 + 2 few-shots | 5/6 | 5/6 | **0.83** |
+| v4 — `{"sql": ...}` ou `{"error": ...}` | 6/6 | 6/6 | **1.00** |
 
-O contrato JSON tira o `pass_rate` de 0 para 0.83. Few-shot em cima **não** sobe. [experiments/001-sql-generation/README.md](experiments/001-sql-generation/README.md).
+O contrato JSON tira o `pass_rate` de 0 para 0.83. Few-shot em cima **não** sobe. O suporte a recusa estruturada no contrato (v4) leva a 1.00. [experiments/001-sql-generation/README.md](experiments/001-sql-generation/README.md).
 
 ## 002 — Limpeza de dados
 

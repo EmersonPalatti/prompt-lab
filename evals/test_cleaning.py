@@ -66,6 +66,40 @@ def test_field_score_partial():
     assert accuracy == round(2 / 3, 4)
 
 
+def test_field_score_penalizes_extra_rows():
+    actual = [
+        {"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10},
+        {"id": 2, "city": "Rio", "status": "paid", "amount": 20},
+    ]
+    expected = [
+        {"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10},
+    ]
+    accuracy, rows_match = field_score(actual, expected)
+    assert rows_match is False
+    assert accuracy == round(3 / 6, 4)
+
+
+def test_field_score_penalizes_duplicate_ids():
+    actual = [
+        {"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10},
+        {"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10},
+    ]
+    expected = [
+        {"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10},
+    ]
+    accuracy, rows_match = field_score(actual, expected)
+    assert rows_match is False
+    assert accuracy == round(3 / 6, 4)
+
+
+def test_field_score_custom_compare_keys():
+    actual = [{"id": 1, "status": "paid"}]
+    expected = [{"id": 1, "status": "paid"}]
+    accuracy, rows_match = field_score(actual, expected, compare_keys=("status",))
+    assert rows_match is True
+    assert accuracy == 1.0
+
+
 def test_pass_rate_needs_json_and_rows(tmp_path: Path):
     experiment = _write_cleaning(
         tmp_path / "exp",
@@ -75,6 +109,12 @@ def test_pass_rate_needs_json_and_rows(tmp_path: Path):
     assert summary["metrics"]["v1"]["pass_rate"] == 1.0
     assert summary["metrics"]["v1"]["field_accuracy"] == 1.0
     assert summary["cases"][0]["json_ok"] is True
+    assert summary["cases"][0]["expected_rows"] == [
+        {"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10}
+    ]
+    assert summary["cases"][0]["actual_rows"] == [
+        {"id": 1, "city": "Sao Paulo", "status": "paid", "amount": 10}
+    ]
 
 
 def test_text_output_does_not_pass(tmp_path: Path):

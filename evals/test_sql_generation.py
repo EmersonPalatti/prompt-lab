@@ -5,6 +5,7 @@ import duckdb
 import pytest
 
 from prompt_lab.experiment import (
+    _score_output,
     extract_sql_for_diagnosis,
     load_spec,
     parse_sql,
@@ -207,6 +208,48 @@ def test_write_results_does_not_touch_repo_experiment(tmp_path: Path):
     assert after == before
 
 
+def test_parse_sql_with_allow_error():
+    sql, error = parse_sql('{"sql": "SELECT 1"}', allow_error=True)
+    assert sql == "SELECT 1"
+    assert error is None
+
+    sql, error = parse_sql('{"error": "coluna inexistente"}', allow_error=True)
+    assert sql is None
+    assert error is None
+
+    sql, error = parse_sql('{"error": "coluna inexistente"}', allow_error=False)
+    assert sql is None
+    assert error is not None
+
+
+def test_score_refusal_as_pass_when_expected_rows_empty():
+    scored = _score_output(
+        '{"error": "coluna inexistente"}',
+        setup=[],
+        expected_rows=[],
+        allow_error=True,
+    )
+    assert scored["json_ok"] is True
+    assert scored["sql_extracted"] is False
+    assert scored["actual_rows"] == []
+    assert scored["rows_match"] is True
+    assert scored["error"] is None
+
+
+def test_score_refusal_as_fail_when_expected_rows_not_empty():
+    scored = _score_output(
+        '{"error": "recusa indevida"}',
+        setup=[],
+        expected_rows=[{"n": 1}],
+        allow_error=True,
+    )
+    assert scored["json_ok"] is True
+    assert scored["sql_extracted"] is False
+    assert scored["actual_rows"] == []
+    assert scored["rows_match"] is False
+    assert scored["error"] == "recusa indevida: recusa indevida"
+
+
 def test_001_spec_has_six_cases():
     spec = load_spec(EXPERIMENT / "inputs.yaml")
     assert [case.id for case in spec.cases] == [
@@ -218,10 +261,11 @@ def test_001_spec_has_six_cases():
         "top_city",
     ]
     summary = score_experiment(EXPERIMENT)
-    assert {"v1", "v2", "v3"} <= set(summary["metrics"])
+    assert {"v1", "v2", "v3", "v4"} <= set(summary["metrics"])
     assert summary["metrics"]["v1"]["cases"] == 6
     assert summary["metrics"]["v2"]["cases"] == 6
     assert summary["metrics"]["v3"]["cases"] == 6
+    assert summary["metrics"]["v4"]["cases"] == 6
 
 
 def test_committed_results_match_scorer_when_present():

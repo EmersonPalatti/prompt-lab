@@ -47,7 +47,19 @@ def _load_env() -> None:
 
 def call_model(messages: list[dict], model: str) -> ModelReply:
     from litellm import completion
-    from litellm.exceptions import RateLimitError as LiteRateLimitError
+    from litellm.exceptions import (
+        APIConnectionError,
+        RateLimitError as LiteRateLimitError,
+        ServiceUnavailableError,
+        Timeout,
+    )
+
+    transient_errors = (
+        LiteRateLimitError,
+        ServiceUnavailableError,
+        APIConnectionError,
+        Timeout,
+    )
 
     last_error: Exception | None = None
     for attempt in range(MAX_RETRIES):
@@ -61,11 +73,13 @@ def call_model(messages: list[dict], model: str) -> ModelReply:
                 timeout=REQUEST_TIMEOUT_S,
                 extra_headers={"X-Title": "Prompt Lab"},
             )
-        except LiteRateLimitError as exc:
+        except transient_errors as exc:
             last_error = exc
-            retry_after = getattr(exc, "retry_after", None) or 2 ** attempt
             if attempt == MAX_RETRIES - 1:
-                raise RateLimitError("rate limit persistente no OpenRouter") from exc
+                raise RateLimitError(
+                    "rate limit ou falha transitória persistente no OpenRouter"
+                ) from exc
+            retry_after = getattr(exc, "retry_after", None) or 2 ** attempt
             time.sleep(float(retry_after))
             continue
 
@@ -81,7 +95,9 @@ def call_model(messages: list[dict], model: str) -> ModelReply:
             cost_usd=float(hidden.get("response_cost") or 0.0),
         )
 
-    raise RateLimitError("rate limit persistente no OpenRouter") from last_error
+    raise RateLimitError(
+        "rate limit ou falha transitória persistente no OpenRouter"
+    ) from last_error
 
 
 def run_experiment(
@@ -136,6 +152,8 @@ def run_experiment(
                 "prompt_tokens": reply.prompt_tokens,
                 "completion_tokens": reply.completion_tokens,
             }
+            if reply.cost_usd:
+                usages[(version, case_id)]["cost_usd"] = round(reply.cost_usd, 6)
             prompt_tokens += reply.prompt_tokens
             completion_tokens += reply.completion_tokens
             cost_usd += reply.cost_usd

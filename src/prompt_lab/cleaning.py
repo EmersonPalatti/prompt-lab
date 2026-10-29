@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from prompt_lab.experiment import (
+from prompt_lab.common import (
     _normalize,
     experiment_kind,
     list_versions,
@@ -47,29 +47,47 @@ def extract_clean_for_diagnosis(text: str) -> list[dict] | None:
     return None
 
 
-def field_score(actual: list[dict], expected: list[dict]) -> tuple[float, bool]:
+def field_score(
+    actual: list[dict],
+    expected: list[dict],
+    compare_keys: tuple[str, ...] = _COMPARE_KEYS,
+) -> tuple[float, bool]:
     expected_by_id = {row["id"]: row for row in expected}
     actual_by_id = {row["id"]: row for row in actual}
-    total = len(expected) * len(_COMPARE_KEYS)
+    has_duplicates = len(actual_by_id) != len(actual)
+    extra = set(actual_by_id) - set(expected_by_id)
+    denom_rows = max(len(expected), len(actual)) if (has_duplicates or extra) else len(expected)
+    total = denom_rows * len(compare_keys)
     hits = 0
     for row_id, expected_row in expected_by_id.items():
         actual_row = actual_by_id.get(row_id)
         if actual_row is None:
             continue
-        for key in _COMPARE_KEYS:
+        for key in compare_keys:
             if _normalize(actual_row.get(key)) == _normalize(expected_row.get(key)):
                 hits += 1
-    extra = set(actual_by_id) - set(expected_by_id)
-    rows_match = not extra and hits == total and set(actual_by_id) == set(expected_by_id)
+
+    rows_match = (
+        not has_duplicates
+        and len(actual) == len(expected)
+        and not extra
+        and hits == (len(expected) * len(compare_keys))
+        and set(actual_by_id) == set(expected_by_id)
+    )
     accuracy = round(hits / total, 4) if total else 0.0
     return accuracy, rows_match
 
 
-def _score_output(output: str, expected_rows: list[dict]) -> dict:
+def _score_output(
+    output: str,
+    expected_rows: list[dict],
+    compare_keys: tuple[str, ...] = _COMPARE_KEYS,
+) -> dict:
     record = {
         "json_ok": False,
         "field_accuracy": 0.0,
         "rows_match": False,
+        "actual_rows": None,
         "error": None,
         "output": output,
     }
@@ -82,7 +100,8 @@ def _score_output(output: str, expected_rows: list[dict]) -> dict:
         return record
 
     record["json_ok"] = json_ok
-    accuracy, rows_match = field_score(rows, expected_rows)
+    record["actual_rows"] = rows
+    accuracy, rows_match = field_score(rows, expected_rows, compare_keys=compare_keys)
     record["field_accuracy"] = accuracy
     record["rows_match"] = rows_match
     if not rows_match:
@@ -97,6 +116,7 @@ def score_cleaning_experiment(experiment: Path) -> dict:
         raise ValueError(f"{experiment} não é kind: cleaning")
 
     spec = load_cleaning_spec(experiment / "inputs.yaml")
+    compare_keys = spec.compare_keys
     versions = list_versions(experiment)
     scored_cases: list[dict] = []
 
@@ -108,6 +128,8 @@ def score_cleaning_experiment(experiment: Path) -> dict:
                 "id": case.id,
                 "version": version,
                 "question": case.question,
+                "expected_rows": case.expected_rows,
+                "actual_rows": None,
                 "rendered": render_case(
                     experiment, version, case.question, rows=rows_text
                 ),
@@ -124,6 +146,7 @@ def score_cleaning_experiment(experiment: Path) -> dict:
             scored = _score_output(
                 output_path.read_text(encoding="utf-8").strip(),
                 case.expected_rows,
+                compare_keys=compare_keys,
             )
             record.update(scored)
             scored_cases.append(record)

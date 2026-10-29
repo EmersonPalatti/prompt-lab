@@ -1,7 +1,7 @@
 [project]
 name = "prompt-lab"
 version = "0.1.0"
-description = "Pipeline de avaliação para geração de SQL com LLM"
+description = "Pipeline de avaliação para geração de SQL e limpeza de dados com LLM"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,6 +13,9 @@ dependencies = [
     "streamlit>=1.66.1",
     "truststore>=0.10.5",
 ]
+
+[project.scripts]
+prompt-lab = "prompt_lab.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.9.28,<0.10.0"]

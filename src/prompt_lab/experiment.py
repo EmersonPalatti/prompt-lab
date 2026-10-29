@@ -8,30 +8,51 @@ from __future__ import annotations
 
 import json
 import re
-from decimal import Decimal
 from pathlib import Path
 
 import duckdb
-import yaml
 from pydantic import ValidationError
 
-from prompt_lab.schema import ExperimentSpec, SqlAnswer, is_single_statement
+from prompt_lab.common import (
+    _normalize,
+    experiment_kind,
+    list_versions,
+    load_yaml_mapping,
+    render_case,
+    render_prompt,
+)
+from prompt_lab.schema import (
+    ExperimentSpec,
+    SqlAnswer,
+    SqlOrErrorAnswer,
+    is_single_statement,
+)
+
+__all__ = [
+    "STATEMENT_TIMEOUT_MS",
+    "_normalize",
+    "experiment_kind",
+    "extract_sql_for_diagnosis",
+    "list_versions",
+    "load_spec",
+    "load_yaml_mapping",
+    "parse_sql",
+    "prompts_for_run",
+    "public_payload",
+    "render_case",
+    "render_prompt",
+    "row_set",
+    "run_sql",
+    "schema_text",
+    "score_experiment",
+    "score_path",
+    "write_results",
+]
 
 STATEMENT_TIMEOUT_MS = 5000
 _FENCE = re.compile(r"```(?:sql|json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 _SELECT = re.compile(r"^(SELECT|WITH)\b", re.IGNORECASE)
 _CREATE = re.compile(r"^CREATE\b", re.IGNORECASE)
-
-
-def load_yaml_mapping(path: Path) -> dict:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise ValueError(f"{path} deve ser um mapeamento YAML")
-    return data
-
-
-def experiment_kind(experiment: Path) -> str:
-    return str(load_yaml_mapping(experiment / "inputs.yaml").get("kind", "sql"))
 
 
 def load_spec(path: Path) -> ExperimentSpec:
@@ -43,22 +64,17 @@ def schema_text(setup: list[str]) -> str:
     return "\n\n".join(creates)
 
 
-def render_prompt(template: str, *, question: str, schema: str = "", rows: str = "") -> str:
-    return (
-        template.replace("{{question}}", question)
-        .replace("{{schema}}", schema)
-        .replace("{{rows}}", rows)
-    )
-
-
-def parse_sql(text: str) -> tuple[str | None, str | None]:
-    """Devolve (sql, erro). Só aceita o JSON do modelo SqlAnswer."""
+def parse_sql(text: str, *, allow_error: bool = False) -> tuple[str | None, str | None]:
+    """Devolve (sql, erro). Só aceita o JSON do modelo SqlAnswer (ou SqlOrErrorAnswer)."""
 
     try:
+        if allow_error:
+            answer = SqlOrErrorAnswer.model_validate_json(text.strip())
+            return answer.sql, None
         answer = SqlAnswer.model_validate_json(text.strip())
+        return answer.sql, None
     except ValidationError as exc:
         return None, exc.errors()[0]["msg"]
-    return answer.sql, None
 
 
 def extract_sql_for_diagnosis(text: str) -> str | None:
@@ -80,16 +96,6 @@ def extract_sql_for_diagnosis(text: str) -> str | None:
     if _SELECT.match(stripped):
         return stripped
     return None
-
-
-def _normalize(value: object) -> object:
-    if isinstance(value, Decimal):
-        if value == value.to_integral_value():
-            return int(value)
-        return float(value)
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
-    return value
 
 
 def _row_sort_key(row: tuple[tuple[str, object], ...]) -> list[tuple]:
@@ -128,42 +134,6 @@ def run_sql(setup: list[str], sql: str, timeout_ms: int = STATEMENT_TIMEOUT_MS) 
         return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
     finally:
         connection.close()
-
-
-def list_versions(experiment: Path) -> list[str]:
-    names = [
-        path.name
-        for path in experiment.iterdir()
-        if path.is_dir() and (path / "prompt.md").is_file()
-    ]
-    return sorted(names)
-
-
-def render_case(
-    experiment: Path,
-    version: str,
-    question: str,
-    schema: str = "",
-    rows: str = "",
-) -> dict:
-    prompt_dir = experiment / version
-    system_path = prompt_dir / "system.md"
-    return {
-        "system": render_prompt(
-            system_path.read_text(encoding="utf-8"),
-            question=question,
-            schema=schema,
-            rows=rows,
-        )
-        if system_path.is_file()
-        else None,
-        "prompt": render_prompt(
-            (prompt_dir / "prompt.md").read_text(encoding="utf-8"),
-            question=question,
-            schema=schema,
-            rows=rows,
-        ),
-    }
 
 
 def prompts_for_run(experiment: Path) -> list[tuple[str, str, dict]]:
@@ -209,16 +179,45 @@ def score_path(experiment: Path) -> dict:
     return score_experiment(experiment)
 
 
-def _score_output(output: str, setup: list[str], expected_rows: list[dict]) -> dict:
+def _score_output(
+    output: str,
+    setup: list[str],
+    expected_rows: list[dict],
+    *,
+    allow_error: bool = False,
+) -> dict:
     record = {
         "json_ok": False,
         "sql_extracted": False,
         "rows_match": False,
+        "actual_rows": None,
         "error": None,
         "output": output,
     }
-    sql, parse_error = parse_sql(output)
-    json_ok = sql is not None
+    if allow_error:
+        try:
+            answer = SqlOrErrorAnswer.model_validate_json(output.strip())
+        except ValidationError as exc:
+            answer = None
+            parse_error = exc.errors()[0]["msg"]
+        else:
+            parse_error = None
+
+        if answer is not None and answer.error is not None:
+            record["json_ok"] = True
+            record["sql_extracted"] = False
+            record["actual_rows"] = []
+            record["rows_match"] = expected_rows == []
+            if not record["rows_match"]:
+                record["error"] = f"recusa indevida: {answer.error}"
+            return record
+
+        sql = answer.sql if answer is not None else None
+        json_ok = sql is not None
+    else:
+        sql, parse_error = parse_sql(output)
+        json_ok = sql is not None
+
     if sql is None:
         sql = extract_sql_for_diagnosis(output)
     if sql is None:
@@ -237,6 +236,7 @@ def _score_output(output: str, setup: list[str], expected_rows: list[dict]) -> d
         record["error"] = str(exc).splitlines()[0]
         return record
 
+    record["actual_rows"] = actual
     record["rows_match"] = row_set(actual) == row_set(expected_rows)
     if not record["rows_match"]:
         record["error"] = "linhas diferentes do esperado"
@@ -255,11 +255,14 @@ def score_experiment(experiment: Path) -> dict:
     for case in spec.cases:
         for version in versions:
             output_path = experiment / "outputs" / version / f"{case.id}.txt"
+            rendered = render_case(experiment, version, case.question, schema)
             record = {
                 "id": case.id,
                 "version": version,
                 "question": case.question,
-                "rendered": render_case(experiment, version, case.question, schema),
+                "expected_rows": case.expected_rows,
+                "actual_rows": None,
+                "rendered": rendered,
                 "json_ok": False,
                 "sql_extracted": False,
                 "rows_match": False,
@@ -271,10 +274,12 @@ def score_experiment(experiment: Path) -> dict:
                 scored_cases.append(record)
                 continue
 
+            allow_error = '"error"' in (rendered["prompt"] + (rendered["system"] or ""))
             scored = _score_output(
                 output_path.read_text(encoding="utf-8").strip(),
                 setup,
                 case.expected_rows,
+                allow_error=allow_error,
             )
             record.update(scored)
             scored_cases.append(record)
@@ -325,7 +330,7 @@ def public_payload(summary: dict) -> dict:
             "rows_match": item["rows_match"],
             "error": item["error"],
         }
-        for key in ("sql_extracted", "field_accuracy", "latency_s", "prompt_tokens", "completion_tokens"):
+        for key in ("sql_extracted", "field_accuracy", "latency_s", "prompt_tokens", "completion_tokens", "cost_usd"):
             if item.get(key) is not None:
                 row[key] = item[key]
         public_cases.append(row)
@@ -355,14 +360,33 @@ def write_results(experiment: Path, summary: dict | None = None, extra: dict | N
     payload.setdefault("source", summary.get("source", "outputs"))
 
     previous = {(item.get("id"), item.get("version")): item for item in existing.get("cases", [])}
+    rerun_versions = {row["version"] for row in payload["cases"] if "latency_s" in row}
+    all_versions = {row["version"] for row in payload["cases"]}
+    is_partial_run = bool(rerun_versions and rerun_versions < all_versions)
+
     for row in payload["cases"]:
         prev = previous.get((row["id"], row["version"]), {})
-        for key in ("latency_s", "prompt_tokens", "completion_tokens"):
+        for key in ("latency_s", "prompt_tokens", "completion_tokens", "cost_usd"):
             if key not in row and key in prev:
                 row[key] = prev[key]
 
     payload["prompt_tokens"] = sum(int(item.get("prompt_tokens") or 0) for item in payload["cases"])
     payload["completion_tokens"] = sum(int(item.get("completion_tokens") or 0) for item in payload["cases"])
+
+    case_costs = [float(item["cost_usd"]) for item in payload["cases"] if "cost_usd" in item]
+    if case_costs:
+        payload["cost_usd"] = round(sum(case_costs), 6)
+    elif is_partial_run and "cost_usd" in existing:
+        run_cost = float(extra.get("cost_usd", 0.0))
+        if run_cost > 0:
+            payload["cost_usd"] = round(float(existing["cost_usd"]) + run_cost, 6)
+        else:
+            payload["cost_usd"] = float(existing["cost_usd"])
+    elif "cost_usd" in extra:
+        payload["cost_usd"] = float(extra["cost_usd"])
+    elif "cost_usd" in existing:
+        payload["cost_usd"] = float(existing["cost_usd"])
+
     if "started_at" in existing:
         payload["started_at"] = existing["started_at"]
 

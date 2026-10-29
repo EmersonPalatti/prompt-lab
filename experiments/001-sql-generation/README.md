@@ -10,23 +10,24 @@ O modelo **não** vê os `INSERT`. Só o `CREATE TABLE`. Quem inventa coluna ou 
 
 1. Pedir “só o SQL” ainda produz texto. Pedir o contrato JSON no system e no user faz a saída validar; a execução pontua a consulta à parte.
 2. Com o contrato já no lugar, dois few-shots de JSON válido (perguntas **fora** do eval) sobem o `pass_rate` no caso que a v2 ainda perde.
+3. Dar ao contrato um segundo ramo explícito (`{"sql": "..."}` ou `{"error": "..."}`) resolve o caso de coluna inexistente sem quebrar os 5 casos válidos, levando o `pass_rate` a 1.00 (6/6).
 
-Uma variável por vez: v1→v2 muda o contrato; v2→v3 só acrescenta exemplos.
+Uma variável por vez: v1→v2 muda o contrato; v2→v3 só acrescenta exemplos; v3→v4 evolui o contrato para recusa explícita (sem few-shots).
 
 ## Run
 
-Mesmo modelo nas três versões: `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free`.
+Mesmo modelo nas versões: `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free`.
 
-| | v1+v2 | v3 |
-|---|---|---|
-| quando | 2026-10-28T00:37:49Z | 2026-10-28T01:10:49Z (finished_at) |
-| source | `openrouter` | `openrouter` |
-| custo USD | 0 (`:free`) | 0 |
-| repeats | 1 | 1 |
+| | v1+v2 | v3 | v4 |
+|---|---|---|---|
+| quando | 2026-10-28T00:37:49Z | 2026-10-28T01:10:49Z (finished_at) | 2026-10-29T01:46:47Z (finished_at) |
+| source | `openrouter` | `openrouter` | `openrouter` |
+| custo USD | 0 (`:free`) | 0 | 0 |
+| repeats | 1 | 1 | 1 |
 
-Tokens no `results.json` são a soma dos casos commitados (v1+v2+v3): 2895 prompt + 3830 completion.
+Tokens no `results.json` são a soma dos casos commitados (v1+v2+v3+v4): 4046 prompt + 4742 completion.
 
-`pytest` não chama o modelo. O `run --version v3` não reescreveu `outputs/v1` nem `outputs/v2`.
+`pytest` não chama o modelo. O `run --version v4` não reescreveu `outputs/v1`, `outputs/v2` nem `outputs/v3`.
 
 ## Métricas
 
@@ -37,6 +38,7 @@ Tokens no `results.json` são a soma dos casos commitados (v1+v2+v3): 2895 promp
 | v1 — só SQL | 0/6 | 5/6 | 5/6 | 0.00 |
 | v2 — JSON | 6/6 | 6/6 | 5/6 | 0.83 |
 | v3 — JSON + 2 few-shots | 5/6 | 5/6 | 5/6 | 0.83 |
+| v4 — JSON (`sql` ou `error`) | 6/6 | 5/6 | 6/6 | 1.00 |
 
 ## v1
 
@@ -78,22 +80,36 @@ No 6º, few-shot **não** subiu o `pass_rate`. Mudou o modo de falha. Em vez de 
 
 Hipótese 2 **não** confirmada. Few-shot de sucessos não ensinou o caso de schema inexistente; o modelo saiu do contrato.
 
+## v4
+
+Prompt em `v4/prompt.md` e system em `v4/system.md`. Contrato com dois ramos explícitos: `{"sql": "..."}` ou `{"error": "..."}`. Sem few-shots (isolando a variável de contrato).
+
+Nos 5 casos válidos, o modelo emite `{"sql": "..."}` correto (DuckDB executa e linhas batem).
+
+No 6º caso (`unknown_column`), o modelo usa o ramo de recusa estruturada:
+
+```json
+{"error": "coluna courier_rating não existe no esquema"}
+```
+
+Valida em `SqlOrErrorAnswer`, `sql_extracted` é falso (não há SQL a executar), e `rows_match` é verdadeiro porque o caso esperava recusa (`expected_rows: []`).
+
+6/6 validam o JSON, 6/6 batem o comportamento esperado (`pass_rate` 1.00).
+
+Hipótese 3 confirmada: quando o contrato modela a recusa estruturada, o modelo abstém-se honestamente sem quebrar a validação nem emitir SQL sintaticamente inválido.
+
 ## O que isso mostra (e o que não mostra)
 
-O ganho veio do contrato JSON, não dos exemplos. Few-shot aqui foi nulo no `pass_rate` e pior no formato do caso difícil.
+O ganho veio do contrato JSON e da modelagem de recusa estruturada (`sql` ou `error`), não de exemplos few-shot. Few-shot aqui foi nulo no `pass_rate` e pior no formato do caso difícil.
 
 Não mostra consistência (n=1) nem outro modelo.
-
-## Próxima iteração (não feita)
-
-Contrato `sql` **ou** `error`. A v3 já tentou emitir `error` sozinha; o scorer recusou. Só vale se o eval passar a aceitar o segundo ramo — senão estamos punindo a recusa honesta.
 
 ## Como reproduzir
 
 ```powershell
 uv run pytest
 uv run python -m prompt_lab score experiments/001-sql-generation
-uv run python -m prompt_lab run experiments/001-sql-generation --version v3
+uv run python -m prompt_lab run experiments/001-sql-generation --version v4
 ```
 
 `run` sem `--version` chama **todas** as versões e reescreve `outputs/`. Com `--version` só toca essa pasta. `score` só relê o Git.
